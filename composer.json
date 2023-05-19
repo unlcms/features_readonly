@@ -1,0 +1,16 @@
+{
+  "name": "unlcms/features_readonly",
+  "description": "Enables making configuration managed by Features read-only to prevent changes.",
+  "type": "drupal-module",
+  "authors": [
+    {
+      "name": "Eric Rasmussen (ericras)",
+      "homepage": "https://www.drupal.org/u/ericras",
+      "role": "Maintainer"
+    }
+  ],
+  "require": {
+    "drupal/core": "^9.4 || ^10",
+    "drupal/features": "^5.0.0"
+  }
+}
