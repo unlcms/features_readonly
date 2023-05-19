@@ -1,0 +1,65 @@
+<?php
+
+/**
+ * @file
+ * Contains features_readonly.module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Site\Settings;
+use Drupal\features_readonly\ReadOnlyFormEvent;
+
+/**
+ * Implements hook_form_alter().
+ */
+function features_readonly_form_alter(array &$form, FormStateInterface &$form_state, $form_id) {
+  if (Settings::get('features_readonly_disable')) {
+    return;
+  }
+
+  $event = new ReadOnlyFormEvent($form_state);
+  \Drupal::service('event_dispatcher')->dispatch($event, ReadOnlyFormEvent::NAME );
+
+  if ($event->isFormReadOnly()) {
+    \Drupal::messenger()->addWarning('This form cannot be saved because this configuration item is managed with Features.');
+    $form['#validate'][] = '_features_readonly_validate_failure';
+    if (isset($form['actions']['submit'])) {
+      $form['actions']['submit']['#disabled'] = TRUE;
+    }
+    if (isset($form['actions']['delete'])) {
+      $form['actions']['delete']['#access'] = FALSE;
+    }
+  }
+
+  // Prevent adding new fields to entity types.
+  // @todo Instead of this, do a custom access check on the
+  //   field_ui.field_storage_config_add_node route in alterRoutes().
+  if ($form_id == 'field_ui_field_storage_add_form') {
+    $entity_type = $form_state->get('entity_type_id');
+    if ($entity_type == 'taxonomy_term') {
+      $entity_type = 'taxonomy';
+    }
+    $bundle = $form_state->get('bundle');
+    $bundle_entity_type = ($entity_type == 'taxonomy' ? 'vocabulary' : 'type');
+
+    // Construct the "main" entity config name e.g. 'node.type.page' or 'taxonomy.vocabulary.tags'.
+    $entity_config_name = $entity_type . '.' . $bundle_entity_type . '.' . $bundle;
+
+    if (\Drupal::service('features_readonly_form_subscriber')->isControlledByFeatures($entity_config_name)) {
+      \Drupal::messenger()->addWarning('This content type is managed with Features and cannot have fields added.');
+      $form['#access'] = FALSE;
+    }
+  }
+}
+
+/**
+ * Helper validation function that always returns false.
+ *
+ * @param array $form
+ *   A build form array.
+ * @param \Drupal\Core\Form\FormStateInterface $form_state
+ *   The form state.
+ */
+function _features_readonly_validate_failure(array $form, FormStateInterface &$form_state) {
+  $form_state->setErrorByName(NULL, t('This configuration form cannot be saved because this configuration item is managed with Features.'));
+}
